@@ -219,7 +219,7 @@ class APC
                 $apc = json_decode(apc_fetch($key));
                 // return unix time
                 if ($ttl == 'time') {
-                    return ($apc->ttl + time());
+                    return $apc->ttl;
                 }
                 $ttl = $apc->ttl;
             } else {
