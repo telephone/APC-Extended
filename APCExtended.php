@@ -295,12 +295,15 @@ class APC
      */
     public static function expired()
     {
-        $iterator = new \APCIterator('user', null, APC_ITER_CTIME + APC_ITER_TTL);
+        /**
+         * APC Iterator was returning false for expired. Use apc_cache_info()
+         */
+        $apc = apc_cache_info('user');
         $time = time();
         $a = 0;
-        foreach ($iterator as $key => $val) {
-            if (($val['ttl'] + $val['creation_time']) < $time) {
-                if (apc_delete($key)) {
+        foreach ($apc['cache_list'] as $val) {
+            if ($val['ttl'] && ($val['ttl'] + $val['creation_time']) < $time) {
+                if (apc_delete($val['info'])) {
                     $a++;
                 }
             }
@@ -310,6 +313,7 @@ class APC
 
     /**
      * Iterate through APC and remove unpopular files/keys
+     * - Will only remove non-expired files/keys
      *
      * @param  string $type
      *   Input 'user' or 'opcode' to define which cache to purge
@@ -321,7 +325,7 @@ class APC
      * @return integer
      *   Number of files/keys removed
      */
-    public static function purge($type = user, $hits = 10)
+    public static function purge($type = 'user', $hits = 10)
     {
         $a = 0;
         // iterate through files
@@ -343,7 +347,7 @@ class APC
         }
         // iterate through user cache
         elseif ($type == 'user') {
-            $iterator = new \APCIterator('user', null,  APC_ITER_CTIME + APC_ITER_TTL + APC_ITER_NUM_HITS);
+            $iterator = new \APCIterator('user', null, APC_ITER_NUM_HITS);
             $time = time();
             foreach ($iterator as $key => $val) {
                 if ($val['num_hits'] <= $hits) {
