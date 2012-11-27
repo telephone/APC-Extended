@@ -229,14 +229,16 @@ class APC
      */
     public static function rDelete($regex)
     {
-        $iterator = new \APCIterator('user', $regex, APC_ITER_KEY);
-        /**
-         * - apc_delete wasn't returning true, so just return total count
-         * - getTotalCount() failed when being returned; declared first now
-         */
-        $count = $iterator->getTotalCount();
-        apc_delete($iterator);
-        return $count;
+        $keys  = (array) self::rSearch($regex);
+        $check = apc_delete($keys);
+        if (is_array($check)) {
+            if (apc_delete($keys)) {
+                $return = true;
+            }
+        } elseif ($check) {
+            $return = true;
+        }
+        return (isset($return)) ? count($keys) : 0;
     }
 
     /**
