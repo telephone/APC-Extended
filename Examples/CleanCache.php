@@ -21,7 +21,7 @@ if (!APC::enabled()) {
  * User set variables
  */
 $freeMemory = 20;       // minimum percentage of free memory
-$fileHits   = 20;       // minimum file hits
+$fileHits   = 10;       // minimum file hits
 $userHits   = 10;       // minimum 'user' hits
 
 
@@ -31,9 +31,9 @@ $userHits   = 10;       // minimum 'user' hits
  */
 for ($i=0; $i < 4; $i++) {
     // check free memory
-    if (APC::freeMemory() < $freeMemory) {
+    if (rtrim(APC::freeMemory(true), '%') < $freeMemory) {
         if ($i === 0) {
-            // set memory only once
+            // preserve initial memory
             $memory = APC::freeMemory();
         }
 
@@ -47,9 +47,8 @@ for ($i=0; $i < 4; $i++) {
             // perform function without $hits
             cleanCache($i);
         }
-    }
-    // break loop if available memory is greater than $freeMemory
-    else {
+    } else {
+        // break loop if available memory is greater than $freeMemory
         break;
     }
 }
@@ -58,10 +57,10 @@ for ($i=0; $i < 4; $i++) {
  * Return free memory
  */
 if (isset($memory)) {
-    echo 'Script cleaned free memory from: ' . $memory . '% to: ' . APC::freeMemory() . '%';
-} else {
-    echo 'Free memory: ' . APC::freeMemory() . '%';
+    echo 'Script cleaned: ', (APC::freeMemory() - $memory), ' MB ', "<br>\n";
 }
+echo 'Free memory: ', APC::freeMemory(), ' / ', APC::totalMemory(), ' = ',
+    APC::freeMemory(true);
 
 /**
  * Attempt to clean cache systematically

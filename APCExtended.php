@@ -314,14 +314,30 @@ class APC
     }
 
     /**
-     * Return the percentage of memory free within APC
+     * Return APCs total memory (all segments)
      *
-     * @return float  Percentage of memory free (to one decimal point)
+     * @return string  Formatted string to one decimal: '32.0 MB'
      */
-    public static function freeMemory()
+    public static function totalMemory()
     {
-        $info = apc_sma_info();
-        return round((($info['avail_mem'] / ($info['num_seg']
-            * $info['seg_size'])) * 100), 1);
+        $mem = apc_sma_info(true);
+        return sprintf('%.1f %s', ($mem['num_seg'] * $mem['seg_size'])
+            / pow(1024, 2), ' MB');
+    }
+
+    /**
+     * Return the free memory within APC in either 'MB' or a percentage
+     *
+     * @param  boolean $percentage  True to return percentage
+     * @return string               Formatted string to one decimal:
+     *                              - '10.0 MB'    OR    - '60%'
+     */
+    public static function freeMemory($percentage = false)
+    {
+        $mem = apc_sma_info(true);
+        return ($percentage)
+            ? sprintf('%.1f%s', $mem['avail_mem'] / ($mem['num_seg']
+                * $mem['seg_size']) * 100, '%')
+            : sprintf('%.1f%s', $mem['avail_mem'] / pow(1024, 2), ' MB');
     }
 }
