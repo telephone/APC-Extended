@@ -20,7 +20,9 @@ class APC
      */
     public static function enabled()
     {
-        if (ini_get('apc.enabled') && (phpversion('apc') >= '3.1.1')) {
+        if (ini_get('apc.enabled')
+            && version_compare(phpversion('apc'), '3.1.1', '>=')
+        ) {
             return true;
         }
         return false;
@@ -191,15 +193,12 @@ class APC
     {
         $search = new \stdClass();
         if ($returnValue) {
-            $iterator = new \APCIterator('user', $regex, APC_ITER_KEY
-                + APC_ITER_VALUE);
-            foreach ($iterator as $val) {
+            foreach (new \APCIterator('user', $regex, 34, 100, 1) as $val) {
                 $apc = json_decode($val['value']);
                 $search->$val['key'] = $apc->data;
             }
         } else {
-            $iterator = new \APCIterator('user', $regex, APC_ITER_KEY);
-            foreach ($iterator as $val) {
+            foreach (new \APCIterator('user', $regex, 2, 100, 1) as $val) {
                 $search->$val['key'] = $val['key'];
             }
         }
