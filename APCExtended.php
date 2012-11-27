@@ -321,7 +321,7 @@ class APC
     public static function totalMemory()
     {
         $mem = apc_sma_info(true);
-        return sprintf('%.1f %s', ($mem['num_seg'] * $mem['seg_size'])
+        return sprintf('%.1f%s', ($mem['num_seg'] * $mem['seg_size'])
             / pow(1024, 2), ' MB');
     }
 
