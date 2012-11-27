@@ -7,7 +7,7 @@
  * @copyright   2012 Nick Adams.
  * @link        http://iamtelephone.com
  * @license     http://opensource.org/licenses/MIT MIT License
- * @version     0.1.0
+ * @version     1.0.0
  */
 namespace Telephone\Cache;
 
@@ -43,8 +43,8 @@ class APC
      * Retrieve data/value stored in APC
      * - Object is returned, unless an array was stored
      *
-     * @param  string $key           Key name
-     * @return array|boolean|object  Stored data/value on success
+     * @param  string               $key  Key name
+     * @return array|boolean|object       Stored data/value on success
      */
     public static function fetch($key)
     {
@@ -65,53 +65,48 @@ class APC
      * - If $overwrite is off, the function will perfrom like apc_add() and only
      *   store if the key does not exist
      *
-     * @param  string              $key        Key name
-     * @param  string|array|object $value      Variable to store
-     * @param  integer             $ttl        Seconds until expiry
-     * @param  boolean             $overwrite  If false and APC key exists
-     *                                         funtion will not overwrite
-     * @return boolean                         True on success
+     * @param  string  $key        Key name
+     * @param  mixed   $value      Variable/Value to store
+     * @param  integer $ttl        Seconds until expiry
+     * @param  boolean $overwrite  If false and APC key exists funtion will not
+     *                             overwrite
+     * @return boolean             True on success
      */
-    public static function store($key, $variable, $ttl = 0, $overwrite = false)
+    public static function store($key, $value, $ttl = 0, $overwrite = false)
     {
         if (self::exists($key) && !$overwrite) {
             return false;
         }
 
-        $apc = array('data' => $variable);
+        $apc = array('data' => $value);
         ($ttl !== 0) ? $apc['ttl'] = (time() + $ttl) : $apc['ttl'] = 0;
-        $apc['type'] = gettype($variable);
+        $apc['type'] = gettype($value);
         return apc_store($key, json_encode($apc), $ttl);
     }
 
     /**
      * Update APC key keep original TTL intact
      *
-     * @param  string         $key       Key name
-     * @param  array          $variable  New variable to update
-     * @return boolean|string            Updated value or true on success
+     * @param  string         $key    Key name
+     * @param  array          $value  New variable/value
+     * @return boolean|string         Updated value or true on success
      */
-    public static function update($key, $variable)
+    public static function update($key, $value)
     {
         if (self::exists($key)) {
             $apc = json_decode(apc_fetch($key));
-            // increase/decrease key
-            if (strpos($variable, ':') !== false) {
-                $val = substr($variable, 4);
-                (strpos($variable, 'dec:') !== false) ? $apc->data -= $val
-                    : $apc->data += $val;
+            if (strpos($value, ':') === 3) {
+                // increase/decrease key
+                (strpos($value, 'dec:') !== false)
+                    ? $apc->data -= substr($value, 4)
+                    : $apc->data += substr($value, 4);
                 // return new value
-                if (self::store($key, $apc->data, self::ttl(false, $apc->ttl),
-                    true)
-                ) {
+                if (self::store($key, $apc->data, ($apc->ttl - time()), true)) {
                     return $apc->data;
                 }
-            }
-            // update key
-            else {
-                $apc->data = $variable;
-                return self::store($key, $apc->data,
-                    self::ttl(false, $apc->ttl), true);
+            } else {
+                // update key
+                return self::store($key, $value, ($apc->ttl - time()), true);
             }
         }
         return false;
@@ -164,19 +159,17 @@ class APC
      * @return boolean|integer       TTL in seconds or Unix timestamp
      *                               - 0 = no ttl
      */
-    public static function ttl($key = false, $ttl = null)
+    public static function ttl($key, $ttl = null)
     {
-        if ($key !== false) {
-            if (self::exists($key)) {
-                $apc = json_decode(apc_fetch($key));
+        if (self::exists($key)) {
+            $apc = json_decode(apc_fetch($key));
+            if ($ttl == 'time') {
                 // return Unix timestamp
-                if ($ttl == 'time') {
-                    return $apc->ttl;
-                }
-                $ttl = $apc->ttl;
-            } else {
-                return false;
+                return $apc->ttl;
             }
+            $ttl = $apc->ttl;
+        } else {
+            return false;
         }
         // return seconds or 0 (integer)
         return ($ttl == 0) ? 0 : ($ttl - time());
@@ -186,6 +179,8 @@ class APC
      * Fetch APC key/s in 'user' scope based on a PCRE
      * (Perl Compatible Regular Expression)
      *
+     * PHP memory can easily run out if returning the value of a lot of keys
+     *
      * @param  string         $regex        PCRE pattern to search for
      *                                      - E.g '/^match$/'
      * @param  boolean        $returnValue  True to return an object with
@@ -194,10 +189,6 @@ class APC
      */
     public static function rSearch($regex, $returnValue = false)
     {
-        /**
-         * PHP memory can easily be eaten up if returning the value of hundreds
-         * of keys
-         */
         $search = new \stdClass();
         if ($returnValue) {
             $iterator = new \APCIterator('user', $regex, APC_ITER_KEY
@@ -266,6 +257,9 @@ class APC
      * Iterate through APC and remove unpopular files/keys
      * -Function only removes non-expired files/keys
      *
+     * apc_delete_file() will not remove expired files
+     * To avoid this problem, set "apc.ttl" to '0' in apc.ini
+     *
      * @param  string  $type  Define which cache to purge: 'user' or 'opcode'
      *                        - Default = 'user'
      * @param  integer $hits  Minimum number of hits. If item has been serverd
@@ -280,11 +274,7 @@ class APC
         if ($type == 'opcode') {
             $info = apc_cache_info('opcode');
             foreach ($info['cache_list'] as $file) {
-                if ($file['num_hits'] <= $hits) {
-                    /**
-                     * apc_delete_file will not remove expired files
-                     * In apc.ini, set "apc.ttl" to '0' to avoid this problem
-                     */
+                if ($file['num_hits'] < $hits) {
                     if (apc_delete_file($file['filename'])) {
                         $a++;
                     }
@@ -295,7 +285,7 @@ class APC
         elseif ($type == 'user') {
             $iterator = new \APCIterator('user', null, APC_ITER_NUM_HITS);
             foreach ($iterator as $key => $val) {
-                if ($val['num_hits'] <= $hits) {
+                if ($val['num_hits'] < $hits) {
                     if (apc_delete($key)) {
                         $a++;
                     }
@@ -308,7 +298,7 @@ class APC
     /**
      * Clear APC cache
      *
-     * @param  string  $type  Define cache to clear: 'user' or 'opcode'
+     * @param  string  $type  Define cache to clear: 'user', 'opcode', or 'all'
      *                        - Default = 'user'
      * @return boolean        True on success
      */
