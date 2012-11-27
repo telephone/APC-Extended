@@ -235,7 +235,7 @@ class APC
             if (apc_delete($keys)) {
                 $return = true;
             }
-        } elseif ($check) {
+        } elseif ($check === true) {
             $return = true;
         }
         return (isset($return)) ? count($keys) : 0;
